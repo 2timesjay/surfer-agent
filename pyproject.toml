@@ -1,0 +1,17 @@
+[project]
+name = "surfer-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.42.0",
+    "ragatouille>=0.0.8.post4",
+    "requests>=2.32.3",
+    "beautifulsoup4>=4.12.3",
+    "ruff>=0.6.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
