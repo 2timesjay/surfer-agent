@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import os
+from readability import Document
+import html2text
 
 
 def fetch_page(url, headers=None):
@@ -17,7 +19,7 @@ def prettify_and_print(html_content):
     """Prettify and print the fetched page."""
     soup = BeautifulSoup(html_content, "html.parser")
     print(soup.prettify())
-
+    
 
 def get_links_with_context(html_content):
     """Identify links on the fetched page and return them as a list with context."""
@@ -31,6 +33,34 @@ def get_links_with_context(html_content):
         }
         links.append(link)
     return links
+
+
+def get_images(html_content):
+    """Identify and list images on the fetched page."""
+    soup = BeautifulSoup(html_content, "html.parser")
+    images = []
+    for img in soup.find_all("img"):
+        image = {
+            "src": img.get("src"),
+            "alt": img.get("alt"),
+            "title": img.get("title"),
+        }
+        images.append(image)
+    return images
+
+
+def get_simplified_content(html_content):
+    """Extract the main content from the HTML and convert it to plain text."""
+    doc = Document(html_content)
+    main_content = doc.summary()
+    
+    # Convert HTML to plain text
+    h = html2text.HTML2Text()
+    h.ignore_links = False
+    h.ignore_images = False
+    plain_text = h.handle(main_content)
+    
+    return plain_text
 
 
 def save_page_to_json(url, html_content, headers=None):
@@ -52,20 +82,6 @@ def save_page_to_json(url, html_content, headers=None):
     print(f"Page saved to {filepath}")
 
 
-def get_images(html_content):
-    """Identify and list images on the fetched page."""
-    soup = BeautifulSoup(html_content, "html.parser")
-    images = []
-    for img in soup.find_all("img"):
-        image = {
-            "src": img.get("src"),
-            "alt": img.get("alt"),
-            "title": img.get("title"),
-        }
-        images.append(image)
-    return images
-
-
 # Example usage
 if __name__ == "__main__":
     url = sys.argv[1] if len(sys.argv) > 1 else "https://example.com"
@@ -76,7 +92,10 @@ if __name__ == "__main__":
     html_content = fetch_page(url, headers)
 
     print("Prettified HTML:")
-    prettify_and_print(html_content)
+   
+    print("\nSimplified Content:")
+    simplified_content = get_simplified_content(html_content)
+    print(simplified_content)
 
     print("\nLinks with context:")
     links = get_links_with_context(html_content)
