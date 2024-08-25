@@ -6,7 +6,8 @@ from datetime import datetime
 import os
 from readability import Document
 import html2text
-
+from urllib.parse import urlparse, urljoin
+from collections import deque
 
 def fetch_page(url, headers=None):
     """Fetch the page content from the given URL."""
@@ -63,7 +64,7 @@ def get_simplified_content(html_content):
     return plain_text
 
 
-def save_page_to_json(url, html_content, headers=None):
+def save_page_to_json(url, html_content, headers=None, save_dir='.'):
     """Save browsed pages to JSON files with metadata."""
     data = {
         "url": url,
@@ -73,13 +74,79 @@ def save_page_to_json(url, html_content, headers=None):
     }
 
     filename = f"page_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    os.makedirs("saved_pages", exist_ok=True)
-    filepath = os.path.join("saved_pages", filename)
+    os.makedirs(save_dir, exist_ok=True)
+    filepath = os.path.join(save_dir, filename)
 
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     print(f"Page saved to {filepath}")
+
+
+class Crawler:
+    def __init__(self, max_pages=100, save_dir_root='saved_pages/', ):
+        self.max_pages = max_pages
+        self.visited = set()
+        self.queue = deque()
+        self.save_dir_root = save_dir_root
+
+    def url_to_save_dir(self, url):
+        """Convert a URL to a directory path for saving."""
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
+        path = parsed_url.path.strip('/')
+        
+        if path:
+            save_dir = os.path.join(self.save_dir_root, domain, path)
+        else:
+            save_dir = os.path.join(self.save_dir_root, domain)
+        
+        return save_dir
+
+    def crawl(self, start_url):
+        domain = urlparse(start_url).netloc
+        self.queue.append(start_url)
+        pages_crawled = 0
+
+        while self.queue and pages_crawled < self.max_pages:
+            url = self.queue.popleft()
+            if url in self.visited:
+                continue
+
+            try:
+                html_content = fetch_page(url)
+                self.save_page(url, html_content)
+                self.visited.add(url)
+                pages_crawled += 1
+
+                links = self.get_domain_links(url, html_content, domain)
+                self.queue.extend(links)
+
+                print(f"Crawled: {url}")
+            except Exception as e:
+                print(f"Error crawling {url}: {str(e)}")
+
+        print(f"Crawling completed. Visited {pages_crawled} pages.")
+
+    def get_domain_links(self, base_url, html_content, domain):
+        links_with_context = get_links_with_context(html_content)
+        domain_links = set()
+        for link in links_with_context:
+            full_url = urljoin(base_url, link['url'])
+            if urlparse(full_url).netloc == domain and full_url not in self.visited:
+                domain_links.add(full_url)
+        return domain_links
+
+    def save_page(self, url, html_content):
+        save_dir = self.url_to_save_dir(url)
+        os.makedirs(save_dir, exist_ok=True)
+        
+        parsed_url = urlparse(url)
+        path = parsed_url.path.strip('/')
+        filename = 'index.html' if path.endswith('/') or not path else path.split('/')[-1] + '.html'
+        filepath = os.path.join(save_dir, filename)
+
+        save_page_to_json(url, html_content, headers={})  # Assuming headers are not available in this context
 
 
 # Example usage
@@ -114,3 +181,6 @@ if __name__ == "__main__":
         print(f"Alt text: {image['alt']}")
         print(f"Title: {image['title']}")
         print()
+
+    crawler = Crawler(max_pages=50)
+    crawler.crawl(url)
